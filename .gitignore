@@ -2,3 +2,11 @@
 models
 temp
 __pycache__
+
+# Ignore content of batch processing folders but keep structure
+source/*
+!source/.gitkeep
+inputVideos/*
+!inputVideos/.gitkeep
+outputVideos/*
+!outputVideos/.gitkeep
