@@ -66,9 +66,7 @@ def run_face_processing(source_img, input_video, output_video):
         "--many-faces",
         "--max-memory", "12",
         "--keep-frames",
-        "--temp-frame-quality", "100",
-        "--output-video-quality", "100",
-        "--execution-threads", "4"
+        "--execution-threads", "12"
     ]
 
     print(f"🚀 Comando: {' '.join(cmd)}")
