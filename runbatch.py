@@ -117,9 +117,7 @@ def main():
         output_name = create_output_name(source_image, video)
         print(f"  {i}. {Path(video).name} → {output_name}")
 
-    print()
-    input("⏳ Presiona Enter para comenzar el procesamiento...")
-    print()
+    
 
     # Procesar cada video
     successful = 0
