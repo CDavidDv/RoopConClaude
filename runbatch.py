@@ -4,6 +4,7 @@ import os
 import sys
 import glob
 import subprocess
+import shutil
 from pathlib import Path
 
 def get_source_image():
@@ -72,34 +73,70 @@ def run_face_processing(source_img, input_video, output_video):
         execution_provider = "cpu"
         print("⚠️ ONNX Runtime no encontrado, usando CPU")
 
-    # Pipeline: face_enhancer -> face_swapper -> face_enhancer
+    # Usar solo face_swapper primero, luego agregar enhancer si funciona
     cmd = [
         "python", "run.py",
         "-s", source_img,
         "-t", input_video,
         "-o", output_full_path,
-        "--frame-processor", "face_enhancer", "face_swapper", "face_enhancer",
+        "--frame-processor", "face_swapper",
         "--execution-provider", execution_provider,
         "--keep-fps",
         "--many-faces",
         "--max-memory", "12",
-        "--keep-frames",
-        "--execution-threads", "4"
+        "--execution-threads", "4",
+        "--temp-frame-format", "png",
+        "--temp-frame-quality", "95",
+        "--output-video-quality", "85"
     ]
 
     print(f"🚀 Comando: {' '.join(cmd)}")
     print("-" * 60)
 
     try:
+        # Asegurar que el directorio de salida existe
+        os.makedirs("outputVideos", exist_ok=True)
+
+        # Verificar directorio actual y archivos antes
+        print(f"📂 Directorio actual: {os.getcwd()}")
+        print(f"📁 Carpeta outputVideos existe: {os.path.exists('outputVideos')}")
+
         result = subprocess.run(cmd, check=True, capture_output=False)
 
-        # Verificar que el archivo de salida se creó
-        if os.path.exists(output_full_path):
-            file_size = os.path.getsize(output_full_path) / (1024*1024)  # MB
+        # Buscar el archivo en múltiples ubicaciones posibles
+        possible_paths = [
+            output_full_path,
+            output_video,  # En caso de que se guarde en el directorio actual
+            os.path.join(".", output_video),
+            os.path.join("/content", output_video),  # Para Colab
+            os.path.join("/content/roop", output_video)
+        ]
+
+        found_file = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                found_file = path
+                break
+
+        if found_file:
+            file_size = os.path.getsize(found_file) / (1024*1024)  # MB
+            # Mover archivo a la ubicación correcta si no está ahí
+            if found_file != output_full_path:
+                import shutil
+                shutil.move(found_file, output_full_path)
+                print(f"📦 Archivo movido de {found_file} a {output_full_path}")
             print(f"✅ Completado: {output_video} ({file_size:.1f} MB)")
             return True
         else:
             print(f"❌ El archivo de salida no se creó: {output_full_path}")
+            print("🔍 Buscando archivos en:")
+            for path in possible_paths:
+                print(f"   - {path}: {'✅' if os.path.exists(path) else '❌'}")
+            # Listar archivos en directorio actual
+            print("📋 Archivos en directorio actual:")
+            for f in os.listdir("."):
+                if output_video.split("_")[0] in f or "DanielaAS" in f:
+                    print(f"   🔍 {f}")
             return False
 
     except subprocess.CalledProcessError as e:
@@ -171,6 +208,29 @@ def main():
     print(f"✅ Exitosos: {successful}")
     print(f"❌ Fallidos: {failed}")
     print(f"📁 Resultados en: ./outputVideos/")
+
+    # Verificar archivos creados
+    print("\n🔍 VERIFICANDO ARCHIVOS CREADOS:")
+    output_files = glob.glob("outputVideos/*.mp4")
+    if output_files:
+        total_size = 0
+        for file in sorted(output_files):
+            size = os.path.getsize(file) / (1024*1024)  # MB
+            total_size += size
+            print(f"   📹 {os.path.basename(file)} ({size:.1f} MB)")
+        print(f"\n📊 Total: {len(output_files)} archivos ({total_size:.1f} MB)")
+
+        # Comando para descargar en Colab
+        print(f"\n💾 Para descargar en Colab:")
+        print(f"   from google.colab import files")
+        for file in sorted(output_files):
+            print(f"   files.download('{file}')")
+    else:
+        print("   ❌ No se encontraron archivos de video en outputVideos/")
+        print("\n🔧 DIAGNÓSTICO:")
+        print("   1. Verifica que CUDA esté funcionando")
+        print("   2. Verifica que los videos de entrada sean válidos")
+        print("   3. Revisa los logs de error arriba")
 
     if successful > 0:
         print("\n🎉 ¡Procesamiento completado!")
