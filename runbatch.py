@@ -54,19 +54,37 @@ def run_face_processing(source_img, input_video, output_video):
     print(f"📸 Imagen fuente: {Path(source_img).name}")
     print(f"💾 Salida: {output_video}")
 
+    output_full_path = os.path.join("outputVideos", output_video)
+
+    # Verificar proveedores de ejecución disponibles
+    try:
+        import onnxruntime as ort
+        available_providers = ort.get_available_providers()
+        print(f"🔍 Proveedores disponibles: {available_providers}")
+
+        if 'CUDAExecutionProvider' in available_providers:
+            execution_provider = "cuda"
+            print("🚀 Usando CUDA")
+        else:
+            execution_provider = "cpu"
+            print("⚠️ CUDA no disponible, usando CPU")
+    except ImportError:
+        execution_provider = "cpu"
+        print("⚠️ ONNX Runtime no encontrado, usando CPU")
+
     # Pipeline: face_enhancer -> face_swapper -> face_enhancer
     cmd = [
         "python", "run.py",
         "-s", source_img,
         "-t", input_video,
-        "-o", os.path.join("outputVideos", output_video),
+        "-o", output_full_path,
         "--frame-processor", "face_enhancer", "face_swapper", "face_enhancer",
-        "--execution-provider", "cuda",
+        "--execution-provider", execution_provider,
         "--keep-fps",
         "--many-faces",
         "--max-memory", "12",
         "--keep-frames",
-        "--execution-threads", "12"
+        "--execution-threads", "4"
     ]
 
     print(f"🚀 Comando: {' '.join(cmd)}")
@@ -74,8 +92,16 @@ def run_face_processing(source_img, input_video, output_video):
 
     try:
         result = subprocess.run(cmd, check=True, capture_output=False)
-        print(f"✅ Completado: {output_video}")
-        return True
+
+        # Verificar que el archivo de salida se creó
+        if os.path.exists(output_full_path):
+            file_size = os.path.getsize(output_full_path) / (1024*1024)  # MB
+            print(f"✅ Completado: {output_video} ({file_size:.1f} MB)")
+            return True
+        else:
+            print(f"❌ El archivo de salida no se creó: {output_full_path}")
+            return False
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Error procesando {input_video}: {e}")
         return False
@@ -115,7 +141,6 @@ def main():
         output_name = create_output_name(source_image, video)
         print(f"  {i}. {Path(video).name} → {output_name}")
 
-    
 
     # Procesar cada video
     successful = 0
