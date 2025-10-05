@@ -73,12 +73,13 @@ def run_face_processing(source_img, input_video, output_video):
         print("⚠️ ONNX Runtime no encontrado, usando CPU")
 
     # Pipeline: face_enhancer -> face_swapper -> face_enhancer
+    # "--frame-processor", "face_enhancer", "face_swapper", "face_enhancer",
     cmd = [
         "python", "run.py",
         "-s", source_img,
         "-t", input_video,
         "-o", output_full_path,
-        "--frame-processor", "face_enhancer", "face_swapper", "face_enhancer",
+        "--frame-processor", "face_swapper", "face_enhancer",
         "--execution-provider", execution_provider,
         "--keep-fps",
         "--many-faces",
