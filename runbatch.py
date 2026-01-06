@@ -83,7 +83,7 @@ def run_face_processing(source_img, input_video, output_video):
         "--keep-fps",
         "--many-faces",
         "--max-memory", "10",
-        "--execution-threads", "8" if execution_provider == "cuda" else "1",
+        "--execution-threads", "14" if execution_provider == "cuda" else "1",
         "--output-video-encoder", "h264_nvenc" if execution_provider == "cuda" else "libx264",
         "--output-video-quality", "18",
         "--temp-frame-format", "png",
