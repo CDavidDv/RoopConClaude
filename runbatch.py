@@ -72,8 +72,7 @@ def run_face_processing(source_img, input_video, output_video):
         execution_provider = "cpu"
         print("⚠️ ONNX Runtime no encontrado, usando CPU")
 
-    # Pipeline: face_enhancer -> face_swapper -> face_enhancer
-    # "--frame-processor", "face_enhancer", "face_swapper", "face_enhancer",
+    # Optimized pipeline for maximum quality on T4 GPU
     cmd = [
         "python", "run.py",
         "-s", source_img,
@@ -83,9 +82,12 @@ def run_face_processing(source_img, input_video, output_video):
         "--execution-provider", execution_provider,
         "--keep-fps",
         "--many-faces",
-        "--max-memory", "12",
-        "--keep-frames",
-        "--execution-threads", "4"
+        "--max-memory", "10",
+        "--execution-threads", "8" if execution_provider == "cuda" else "1",
+        "--output-video-encoder", "h264_nvenc" if execution_provider == "cuda" else "libx264",
+        "--output-video-quality", "18",
+        "--temp-frame-format", "png",
+        "--temp-frame-quality", "100"
     ]
 
     print(f"🚀 Comando: {' '.join(cmd)}")
