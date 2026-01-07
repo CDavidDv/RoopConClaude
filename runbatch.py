@@ -137,6 +137,28 @@ def main():
 
     print(f"📸 Imagen fuente: {Path(source_image).name}")
     print(f"🎬 Videos encontrados: {len(input_videos)}")
+
+    # Permitir procesar solo un rango (útil para lotes)
+    start_idx = 0
+    end_idx = len(input_videos)
+
+    if len(sys.argv) > 1:
+        try:
+            if '-' in sys.argv[1]:
+                start, end = sys.argv[1].split('-')
+                start_idx = int(start) - 1
+                end_idx = int(end)
+                print(f"📋 Procesando rango: {start}-{end}")
+            else:
+                start_idx = int(sys.argv[1]) - 1
+                end_idx = start_idx + 1
+                print(f"📋 Procesando solo video #{sys.argv[1]}")
+        except:
+            print("⚠️ Formato de rango inválido. Uso: python runbatch.py [inicio-fin]")
+            print("   Ejemplos: python runbatch.py 1-40  o  python runbatch.py 5")
+
+    input_videos = input_videos[start_idx:end_idx]
+    print(f"🎯 Videos a procesar: {len(input_videos)}")
     print()
 
     # Mostrar lista de videos a procesar
@@ -144,22 +166,23 @@ def main():
         output_name = create_output_name(source_image, video)
         print(f"  {i}. {Path(video).name} → {output_name}")
 
-
     # Procesar cada video
     successful = 0
     failed = 0
+    skipped = 0
 
     for i, video in enumerate(input_videos, 1):
         print(f"\n🎯 Procesando video {i}/{len(input_videos)}")
         output_name = create_output_name(source_image, video)
 
-        # Verificar si ya existe el archivo de salida
+        # Verificar si ya existe el archivo de salida (auto-skip)
         output_path = os.path.join("outputVideos", output_name)
         if os.path.exists(output_path):
-            response = input(f"⚠️ {output_name} ya existe. ¿Sobrescribir? (s/N): ")
-            if response.lower() not in ['s', 'si', 'y', 'yes']:
-                print(f"⏭️ Saltando {output_name}")
-                continue
+            file_size = os.path.getsize(output_path) / (1024*1024)
+            print(f"⏭️ Ya existe: {output_name} ({file_size:.1f} MB) - Saltando")
+            skipped += 1
+            print("-" * 60)
+            continue
 
         if run_face_processing(source_image, video, output_name):
             successful += 1
@@ -172,6 +195,7 @@ def main():
     print("\n" + "=" * 50)
     print("📊 RESUMEN DE PROCESAMIENTO")
     print(f"✅ Exitosos: {successful}")
+    print(f"⏭️ Saltados: {skipped}")
     print(f"❌ Fallidos: {failed}")
     print(f"📁 Resultados en: ./outputVideos/")
 
