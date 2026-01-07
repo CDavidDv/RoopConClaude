@@ -15,12 +15,7 @@ def get_face_analyser() -> Any:
 
     with THREAD_LOCK:
         if FACE_ANALYSER is None:
-            providers = roop.globals.execution_providers
-            # Try TensorrtExecutionProvider first for InsightFace (more reliable than CUDAExecutionProvider)
-            if 'TensorrtExecutionProvider' not in providers and 'CUDAExecutionProvider' in providers:
-                providers = ['TensorrtExecutionProvider'] + providers
-
-            FACE_ANALYSER = insightface.app.FaceAnalysis(name='buffalo_l', providers=providers)
+            FACE_ANALYSER = insightface.app.FaceAnalysis(name='buffalo_l', providers=roop.globals.execution_providers)
             FACE_ANALYSER.prepare(ctx_id=0)
     return FACE_ANALYSER
 
