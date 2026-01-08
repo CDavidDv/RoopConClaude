@@ -1,0 +1,56 @@
+{
+  "title": "RoopConClaude",
+  "description": "Deep learning-based face replacement tool. Swap faces in videos and images using a single source image.",
+  "type": "serverless",
+  "category": "video",
+  "iconUrl": "https://i.ibb.co/4RdPYwQ/Untitled.jpg",
+  "config": {
+    "runsOn": "GPU",
+    "containerDiskInGb": 30,
+    "presets": [
+      {
+        "name": "Standard Face Swap",
+        "defaults": {
+          "FRAME_PROCESSOR": "face_swapper",
+          "OUTPUT_VIDEO_QUALITY": "95"
+        }
+      },
+      {
+        "name": "Face Swap + Enhancement",
+        "defaults": {
+          "FRAME_PROCESSOR": "face_swapper face_enhancer",
+          "OUTPUT_VIDEO_QUALITY": "95"
+        }
+      }
+    ],
+    "env": [
+      {
+        "key": "FRAME_PROCESSOR",
+        "input": {
+          "name": "Frame Processors",
+          "type": "string",
+          "description": "Space-separated list: face_swapper, face_enhancer",
+          "default": "face_swapper face_enhancer"
+        }
+      },
+      {
+        "key": "OUTPUT_VIDEO_QUALITY",
+        "input": {
+          "name": "Output Video Quality",
+          "type": "string",
+          "description": "Quality 0-100 (higher = better quality, slower)",
+          "default": "95"
+        }
+      },
+      {
+        "key": "EXECUTION_PROVIDER",
+        "input": {
+          "name": "Execution Provider",
+          "type": "string",
+          "description": "cpu, cuda, tensorrt",
+          "default": "cuda"
+        }
+      }
+    ]
+  }
+}

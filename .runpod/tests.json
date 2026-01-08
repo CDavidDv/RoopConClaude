@@ -1,0 +1,41 @@
+{
+  "tests": [
+    {
+      "name": "face_swap_test",
+      "input": {
+        "source_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Camponotus_flavomarginatus_ant.jpg/440px-Camponotus_flavomarginatus_ant.jpg",
+        "target_video_url": "https://commondatastorage.googleapis.com/gtv-videos-library/sample/ForBiggerBlazes.mp4",
+        "output_path": "/tmp/output.mp4"
+      },
+      "timeout": 300000
+    }
+  ],
+  "config": {
+    "gpuTypeId": "NVIDIA A100",
+    "gpuCount": 1,
+    "env": [
+      {
+        "key": "FRAME_PROCESSOR",
+        "value": "face_swapper face_enhancer"
+      },
+      {
+        "key": "OUTPUT_VIDEO_QUALITY",
+        "value": "90"
+      },
+      {
+        "key": "EXECUTION_PROVIDER",
+        "value": "cuda"
+      }
+    ],
+    "allowedCudaVersions": [
+      "12.7",
+      "12.6",
+      "12.5",
+      "12.4",
+      "12.3",
+      "12.2",
+      "12.1",
+      "12.0"
+    ]
+  }
+}
