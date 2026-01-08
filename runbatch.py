@@ -4,6 +4,9 @@ import os
 import sys
 import glob
 import subprocess
+import psutil
+import shutil
+import time
 from pathlib import Path
 
 def get_source_image():
@@ -32,6 +35,44 @@ def get_input_videos():
         videos.extend(glob.glob(os.path.join(input_folder, ext.upper())))
 
     return sorted(videos)
+
+def get_memory_usage():
+    """Get current memory usage in GB"""
+    try:
+        process = psutil.Process()
+        return process.memory_info().rss / (1024**3)
+    except:
+        return 0
+
+def get_system_memory_usage():
+    """Get total system memory usage in GB"""
+    try:
+        return psutil.virtual_memory().used / (1024**3)
+    except:
+        return 0
+
+def clean_temp_frames():
+    """Remove temporary frame folders"""
+    try:
+        import glob as glob_module
+        temp_folders = glob_module.glob("roop/temp*")
+        for folder in temp_folders:
+            if os.path.isdir(folder):
+                shutil.rmtree(folder)
+                print(f"🧹 Limpiado: {folder}")
+    except:
+        pass
+
+def wait_for_memory(target_gb=2, timeout=120):
+    """Wait until system memory drops below target"""
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        mem = get_system_memory_usage()
+        if mem < target_gb:
+            return True
+        print(f"⏳ Esperando liberación de memoria... ({mem:.1f}GB)")
+        time.sleep(5)
+    return False
 
 def extract_video_number(video_path):
     """Extract number from video filename"""
@@ -72,7 +113,7 @@ def run_face_processing(source_img, input_video, output_video):
         execution_provider = "cpu"
         print("⚠️ ONNX Runtime no encontrado, usando CPU")
 
-    # Optimized pipeline for maximum quality on T4 GPU
+    # Optimized pipeline for T4 GPU (15GB VRAM, 12GB RAM)
     cmd = [
         "python", "run.py",
         "-s", source_img,
@@ -82,8 +123,8 @@ def run_face_processing(source_img, input_video, output_video):
         "--execution-provider", execution_provider,
         "--keep-fps",
         "--many-faces",
-        "--max-memory", "8",
-        "--execution-threads", "4" if execution_provider == "cuda" else "1",
+        "--max-memory", "11",
+        "--execution-threads", "6" if execution_provider == "cuda" else "1",
         "--output-video-encoder", "h264_nvenc" if execution_provider == "cuda" else "libx264",
         "--output-video-quality", "18",
         "--temp-frame-format", "png",
@@ -94,7 +135,15 @@ def run_face_processing(source_img, input_video, output_video):
     print("-" * 60)
 
     try:
+        mem_before = get_system_memory_usage()
+        print(f"📊 Memoria antes: {mem_before:.1f}GB")
+
         result = subprocess.run(cmd, check=True, capture_output=False)
+
+        # Limpieza después del procesamiento
+        clean_temp_frames()
+        mem_after = get_system_memory_usage()
+        print(f"📊 Memoria después: {mem_after:.1f}GB (diferencia: {mem_after - mem_before:+.1f}GB)")
 
         # Verificar que el archivo de salida se creó
         if os.path.exists(output_full_path):
@@ -107,9 +156,11 @@ def run_face_processing(source_img, input_video, output_video):
 
     except subprocess.CalledProcessError as e:
         print(f"❌ Error procesando {input_video}: {e}")
+        clean_temp_frames()
         return False
     except KeyboardInterrupt:
         print(f"\n⚠️ Procesamiento interrumpido por el usuario")
+        clean_temp_frames()
         return False
 
 def main():
@@ -170,6 +221,10 @@ def main():
     successful = 0
     failed = 0
     skipped = 0
+    memory_warnings = 0
+
+    print(f"\n📈 Memoria del sistema disponible: {psutil.virtual_memory().total / (1024**3):.1f}GB")
+    print()
 
     for i, video in enumerate(input_videos, 1):
         print(f"\n🎯 Procesando video {i}/{len(input_videos)}")
@@ -184,6 +239,18 @@ def main():
             print("-" * 60)
             continue
 
+        # Monitorear memoria antes de procesar
+        current_mem = get_system_memory_usage()
+        total_mem = psutil.virtual_memory().total / (1024**3)
+        mem_percent = (current_mem / total_mem) * 100
+        print(f"💾 Memoria actual: {current_mem:.1f}GB / {total_mem:.1f}GB ({mem_percent:.1f}%)")
+
+        if mem_percent > 85:
+            print(f"⚠️ Memoria alta ({mem_percent:.1f}%). Esperando antes de continuar...")
+            memory_warnings += 1
+            if not wait_for_memory(target_gb=total_mem * 0.5):
+                print("⏱️ Timeout esperando memoria. Continuando de todas formas...")
+
         if run_face_processing(source_image, video, output_name):
             successful += 1
         else:
@@ -197,6 +264,21 @@ def main():
     print(f"✅ Exitosos: {successful}")
     print(f"⏭️ Saltados: {skipped}")
     print(f"❌ Fallidos: {failed}")
+    print(f"⚠️ Advertencias de memoria: {memory_warnings}")
+
+    # Estadísticas de tamaño
+    total_output_size = 0
+    output_count = 0
+    if os.path.exists("outputVideos"):
+        for file in os.listdir("outputVideos"):
+            file_path = os.path.join("outputVideos", file)
+            if os.path.isfile(file_path):
+                total_output_size += os.path.getsize(file_path)
+                output_count += 1
+
+    total_output_gb = total_output_size / (1024**3)
+    print(f"📁 Archivos generados: {output_count}")
+    print(f"💿 Tamaño total: {total_output_gb:.1f}GB")
     print(f"📁 Resultados en: ./outputVideos/")
 
     if successful > 0:
