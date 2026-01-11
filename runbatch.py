@@ -18,17 +18,46 @@ def is_colab():
     except ImportError:
         return False
 
+# Función para sincronizar con Google Drive
+def setup_drive_sync():
+    """Configurar sincronización con Google Drive en Colab"""
+    if not is_colab():
+        return None
+
+    try:
+        from google.colab import drive
+        drive.mount('/content/drive')
+        return '/content/drive/My Drive/RoopOutput'
+    except Exception as e:
+        print(f"⚠️ No se pudo montar Google Drive: {e}")
+        return None
+
 # Función para descargar en Colab
 def download_file_colab(file_path):
     """Descargar archivo en Google Colab"""
     try:
-        from google.colab import files
-        print(f"📥 Descargando: {Path(file_path).name}...")
-        files.download(file_path)
-        print(f"✅ Descargado: {Path(file_path).name}")
-        return True
+        # Intenta con google.colab.files (método interactivo)
+        try:
+            from google.colab import files
+            import IPython
+            print(f"📥 Descargando: {Path(file_path).name}...")
+            # Ejecutar en contexto IPython para que funcione desde script
+            IPython.display.display(IPython.display.FileLink(file_path))
+            files.download(file_path)
+            print(f"✅ Descargado: {Path(file_path).name}")
+            return True
+        except (AttributeError, NameError, RuntimeError):
+            # Si falla, intenta copiar a /content/output para descargar manualmente
+            output_dir = "/content/output"
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+            output_path = os.path.join(output_dir, Path(file_path).name)
+            shutil.copy2(file_path, output_path)
+            print(f"📁 Guardado en: {output_path}")
+            print(f"📥 Disponible para descargar desde /content/output/")
+            return True
     except Exception as e:
-        print(f"⚠️ Error descargando {Path(file_path).name}: {e}")
+        print(f"⚠️ Error en descarga: {e}")
         return False
 
 def get_source_image():
@@ -110,7 +139,7 @@ def create_output_name(source_image, video_path):
     video_number = extract_video_number(video_path)
     return f"{source_name}_{video_number}.mp4"
 
-def run_face_processing(source_img, input_video, output_video):
+def run_face_processing(source_img, input_video, output_video, drive_path=None):
     """Run the complete face processing pipeline"""
 
     print(f"🎬 Procesando: {Path(input_video).name}")
@@ -172,9 +201,22 @@ def run_face_processing(source_img, input_video, output_video):
             file_size = os.path.getsize(output_full_path) / (1024*1024)  # MB
             print(f"✅ Completado: {output_video} ({file_size:.1f} MB)")
 
-            # Descargar automáticamente en Colab
+            # Sincronizar en Colab
             if is_colab():
-                download_file_colab(output_full_path)
+                if drive_path:
+                    # Guardar en Google Drive
+                    try:
+                        if not os.path.exists(drive_path):
+                            os.makedirs(drive_path)
+                        drive_file = os.path.join(drive_path, output_video)
+                        shutil.copy2(output_full_path, drive_file)
+                        print(f"☁️ Guardado en Drive: {output_video}")
+                    except Exception as e:
+                        print(f"⚠️ Error guardando en Drive: {e}")
+                        download_file_colab(output_full_path)
+                else:
+                    # Descargar o copiar a /content/output
+                    download_file_colab(output_full_path)
 
             return True
         else:
@@ -196,9 +238,26 @@ def main():
 
     # Detectar si estamos en Colab
     in_colab = is_colab()
+    drive_path = None
+
     if in_colab:
         print("🔷 Detectado: Google Colab")
-        print("📥 Auto-descarga habilitada después de cada procesamiento")
+        print("📥 Opciones de descarga disponibles:")
+        print("   1. Descargar directamente")
+        print("   2. Sincronizar con Google Drive")
+        print("   3. Copiar a /content/output")
+        print()
+
+        # Intentar montar Drive si está disponible
+        try:
+            from google.colab import drive
+            drive.mount('/content/drive', force_remount=False)
+            drive_path = '/content/drive/My Drive/RoopOutput'
+            print("✅ Google Drive montado")
+            print(f"📁 Los archivos se guardarán en: {drive_path}")
+        except:
+            print("⚠️ Google Drive no disponible")
+            drive_path = None
         print()
 
     # Verificar estructura de carpetas
@@ -290,7 +349,7 @@ def main():
             if not wait_for_memory(target_gb=total_mem * 0.5):
                 print("⏱️ Timeout esperando memoria. Continuando de todas formas...")
 
-        if run_face_processing(source_image, video, output_name):
+        if run_face_processing(source_image, video, output_name, drive_path):
             successful += 1
         else:
             failed += 1
@@ -318,10 +377,16 @@ def main():
     total_output_gb = total_output_size / (1024**3)
     print(f"📁 Archivos generados: {output_count}")
     print(f"💿 Tamaño total: {total_output_gb:.1f}GB")
-    print(f"📁 Resultados en: ./outputVideos/")
 
     if in_colab:
-        print(f"\n📥 Nota: Se descargaron {successful} archivos automáticamente durante el procesamiento")
+        if drive_path:
+            print(f"☁️ Archivos guardados en: {drive_path}")
+            print(f"📝 Accesibles desde Google Drive")
+        else:
+            print(f"📁 Archivos disponibles en: /content/output/")
+            print(f"📥 Descarga manual disponible")
+    else:
+        print(f"📁 Resultados en: ./outputVideos/")
 
     if successful > 0:
         print("\n🎉 ¡Procesamiento completado!")
