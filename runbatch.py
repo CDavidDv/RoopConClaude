@@ -9,6 +9,28 @@ import shutil
 import time
 from pathlib import Path
 
+# Detectar si estamos en Google Colab
+def is_colab():
+    """Verificar si se está ejecutando en Google Colab"""
+    try:
+        import google.colab
+        return True
+    except ImportError:
+        return False
+
+# Función para descargar en Colab
+def download_file_colab(file_path):
+    """Descargar archivo en Google Colab"""
+    try:
+        from google.colab import files
+        print(f"📥 Descargando: {Path(file_path).name}...")
+        files.download(file_path)
+        print(f"✅ Descargado: {Path(file_path).name}")
+        return True
+    except Exception as e:
+        print(f"⚠️ Error descargando {Path(file_path).name}: {e}")
+        return False
+
 def get_source_image():
     """Get the first image from source folder"""
     source_folder = "source"
@@ -149,6 +171,11 @@ def run_face_processing(source_img, input_video, output_video):
         if os.path.exists(output_full_path):
             file_size = os.path.getsize(output_full_path) / (1024*1024)  # MB
             print(f"✅ Completado: {output_video} ({file_size:.1f} MB)")
+
+            # Descargar automáticamente en Colab
+            if is_colab():
+                download_file_colab(output_full_path)
+
             return True
         else:
             print(f"❌ El archivo de salida no se creó: {output_full_path}")
@@ -166,6 +193,13 @@ def run_face_processing(source_img, input_video, output_video):
 def main():
     print("🎭 ROOP BATCH PROCESSOR")
     print("=" * 50)
+
+    # Detectar si estamos en Colab
+    in_colab = is_colab()
+    if in_colab:
+        print("🔷 Detectado: Google Colab")
+        print("📥 Auto-descarga habilitada después de cada procesamiento")
+        print()
 
     # Verificar estructura de carpetas
     folders = ["source", "inputVideos", "outputVideos"]
@@ -205,8 +239,13 @@ def main():
                 end_idx = start_idx + 1
                 print(f"📋 Procesando solo video #{sys.argv[1]}")
         except:
-            print("⚠️ Formato de rango inválido. Uso: python runbatch.py [inicio-fin]")
-            print("   Ejemplos: python runbatch.py 1-40  o  python runbatch.py 5")
+            print("⚠️ Formato de rango inválido.")
+            print("   Uso: python runbatch.py [inicio-fin]")
+            print("   Ejemplos:")
+            print("     python runbatch.py 1-40    # Procesa videos 1 a 40")
+            print("     python runbatch.py 5       # Procesa solo video 5")
+            if in_colab:
+                print("   En Colab: Los archivos se descargan automáticamente")
 
     input_videos = input_videos[start_idx:end_idx]
     print(f"🎯 Videos a procesar: {len(input_videos)}")
@@ -280,6 +319,9 @@ def main():
     print(f"📁 Archivos generados: {output_count}")
     print(f"💿 Tamaño total: {total_output_gb:.1f}GB")
     print(f"📁 Resultados en: ./outputVideos/")
+
+    if in_colab:
+        print(f"\n📥 Nota: Se descargaron {successful} archivos automáticamente durante el procesamiento")
 
     if successful > 0:
         print("\n🎉 ¡Procesamiento completado!")
