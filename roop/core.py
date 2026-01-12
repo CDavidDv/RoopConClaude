@@ -17,8 +17,10 @@ import onnxruntime
 import tensorflow
 import roop.globals
 import roop.metadata
-import roop.ui as ui
 from roop.predictor import predict_image, predict_video
+
+# UI will be imported conditionally based on headless mode
+ui = None
 from roop.processors.frame.core import get_frame_processors_modules
 from roop.utilities import has_image_extension, is_image, is_video, detect_fps, create_video, extract_frames, get_temp_frame_paths, restore_audio, create_temp, move_temp, clean_temp, normalize_output_path
 
@@ -124,7 +126,7 @@ def pre_check() -> bool:
 
 def update_status(message: str, scope: str = 'ROOP.CORE') -> None:
     print(f'[{scope}] {message}')
-    if not roop.globals.headless:
+    if not roop.globals.headless and ui is not None:
         ui.update_status(message)
 
 
@@ -208,6 +210,7 @@ def destroy() -> None:
 
 
 def run() -> None:
+    global ui
     parse_args()
     if not pre_check():
         return
@@ -218,5 +221,6 @@ def run() -> None:
     if roop.globals.headless:
         start()
     else:
+        import roop.ui as ui
         window = ui.init(start, destroy)
         window.mainloop()
