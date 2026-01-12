@@ -1,7 +1,13 @@
 from typing import Any, List, Callable
 import cv2
 import threading
-from gfpgan.utils import GFPGANer
+
+try:
+    from gfpgan.utils import GFPGANer
+    GFPGAN_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    GFPGANer = None
+    GFPGAN_AVAILABLE = False
 
 import roop.globals
 import roop.processors.frame.core
@@ -19,6 +25,8 @@ NAME = 'ROOP.FACE-ENHANCER'
 def get_face_enhancer() -> Any:
     global FACE_ENHANCER
 
+    if not GFPGAN_AVAILABLE:
+        return None
     with THREAD_LOCK:
         if FACE_ENHANCER is None:
             model_path = resolve_relative_path('../models/GFPGANv1.4.pth')
@@ -42,6 +50,9 @@ def clear_face_enhancer() -> None:
 
 
 def pre_check() -> bool:
+    if not GFPGAN_AVAILABLE:
+        update_status('GFPGAN is not available. Face enhancement disabled.', NAME)
+        return False
     download_directory_path = resolve_relative_path('../models')
     conditional_download(download_directory_path, ['https://github.com/TencentARC/GFPGAN/releases/download/v1.3.4/GFPGANv1.4.pth'])
     return True
@@ -59,6 +70,8 @@ def post_process() -> None:
 
 
 def enhance_face(target_face: Face, temp_frame: Frame) -> Frame:
+    if not GFPGAN_AVAILABLE:
+        return temp_frame
     start_x, start_y, end_x, end_y = map(int, target_face['bbox'])
     padding_x = int((end_x - start_x) * 0.5)
     padding_y = int((end_y - start_y) * 0.5)
@@ -69,10 +82,12 @@ def enhance_face(target_face: Face, temp_frame: Frame) -> Frame:
     temp_face = temp_frame[start_y:end_y, start_x:end_x]
     if temp_face.size:
         with THREAD_SEMAPHORE:
-            _, _, temp_face = get_face_enhancer().enhance(
-                temp_face,
-                paste_back=True
-            )
+            enhancer = get_face_enhancer()
+            if enhancer:
+                _, _, temp_face = enhancer.enhance(
+                    temp_face,
+                    paste_back=True
+                )
         temp_frame[start_y:end_y, start_x:end_x] = temp_face
     return temp_frame
 
